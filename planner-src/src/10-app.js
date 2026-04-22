@@ -149,6 +149,7 @@ const App = () => {
   const [showInteg, setShowInteg] = useS(false);
   const [showSync, setShowSync] = useS(false);
   const [showSettings, setShowSettings] = useS(false);
+  const [showAudit, setShowAudit] = useS(false);
   const [showHotkeys, setShowHotkeys] = useS(false);
   const [, forceTick] = useS(0);
   const searchRef = React.useRef(null);
@@ -227,19 +228,27 @@ const App = () => {
 
   const openTask = tasks.find((t) => t.id === openId);
 
+  const audit = (entry) => { if (typeof appendAudit === 'function') appendAudit(entry); };
+
   const handleMove = (id, newStatus) => {
     const prev = tasks.find(t => t.id === id);
     setTasks(tasks.map((t) => t.id === id ? { ...t, status: newStatus, progress: newStatus === 'done' ? 100 : t.progress } : t));
+    const fromLabel = STATUSES.find(s => s.id === prev?.status)?.label || prev?.status || '—';
     const statusLabel = STATUSES.find(s => s.id === newStatus)?.label || newStatus;
+    audit({ action:'move', taskId:id, taskTitle:prev?.title, detail:`${fromLabel} → ${statusLabel}` });
     toast({ msg: `"${prev?.title || id}" → ${statusLabel}`, kind: 'success' });
   };
   const handleSave = (t) => {
     if (isNew) {
       setTasks([...tasks, t]);
       setIsNew(false);setNewDraft(null);
+      audit({ action:'create', taskId:t.id, taskTitle:t.title });
       toast({ msg: `Tarefa ${t.id} criada`, kind: 'success' });
     } else {
+      const prev = tasks.find(x => x.id === t.id);
       setTasks(tasks.map((x) => x.id === t.id ? t : x));
+      const changedFields = prev ? Object.keys(t).filter(k => JSON.stringify(t[k]) !== JSON.stringify(prev[k])) : [];
+      audit({ action:'update', taskId:t.id, taskTitle:t.title, detail: changedFields.length ? `Alterados: ${changedFields.join(', ')}` : '' });
       toast({ msg: `Tarefa ${t.id} salva`, kind: 'success' });
     }
     setOpenId(null);
@@ -250,6 +259,7 @@ const App = () => {
     if (!confirm('Excluir esta tarefa?')) return;
     setTasks(tasks.filter((x) => x.id !== id));
     setOpenId(null);setIsNew(false);setNewDraft(null);
+    audit({ action:'delete', taskId:id, taskTitle:t.title });
     toast({
       msg: `Tarefa ${id} excluída`, kind: 'info',
       action: { label: 'Desfazer', onClick: () => history.undo() }
@@ -261,7 +271,11 @@ const App = () => {
     setIsNew(true);
   };
   const updateTaskDates = (id, start, due) => {
+    const prev = tasks.find(t => t.id === id);
     setTasks(tasks.map(t => t.id === id ? { ...t, start, due } : t));
+    if (prev && (prev.start !== start || prev.due !== due)) {
+      audit({ action:'resize', taskId:id, taskTitle:prev.title, detail:`${start} → ${due}` });
+    }
   };
 
   const exportCSV = () => {
@@ -303,6 +317,7 @@ const App = () => {
       else if (showInteg) setShowInteg(false);
       else if (showSync) setShowSync(false);
       else if (showSettings) setShowSettings(false);
+      else if (showAudit) setShowAudit(false);
       else if (isNew) { setIsNew(false); setNewDraft(null); }
       else if (openId) setOpenId(null);
     },
@@ -310,7 +325,7 @@ const App = () => {
     'mod+shift+z': () => { if (history.canRedo) { history.redo(); toast({ msg: 'Refeito', kind: 'info', ttl: 1500 }); } },
     'mod+y': () => { if (history.canRedo) { history.redo(); toast({ msg: 'Refeito', kind: 'info', ttl: 1500 }); } },
     'mod+k': (e) => { e.preventDefault?.(); searchRef.current?.focus(); searchRef.current?.select(); },
-  }, [openId, isNew, showHotkeys, showInteg, showSync, showSettings, history.canUndo, history.canRedo]);
+  }, [openId, isNew, showHotkeys, showInteg, showSync, showSettings, showAudit, history.canUndo, history.canRedo]);
 
   return (
     <div className="app">
@@ -366,6 +381,11 @@ const App = () => {
           <button className="icon-btn" onClick={() => setShowInteg(true)} title="Integrações">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>
+            </svg>
+          </button>
+          <button className="icon-btn" onClick={() => setShowAudit(true)} title="Log de auditoria">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>
             </svg>
           </button>
           <button className="btn" onClick={exportCSV} title="Exportar CSV">
@@ -541,6 +561,7 @@ const App = () => {
       {showInteg && <IntegrationModal tasks={tasks} onClose={() => setShowInteg(false)}/>}
       {showSync && <SyncPanel tasks={tasks} onImport={(imported) => setTasks(imported.map(migrate))} onClose={() => setShowSync(false)}/>}
       {showSettings && <SettingsPanel tasks={tasks} onTasksChange={setTasks} onDataChange={() => forceTick(x=>x+1)} onClose={() => setShowSettings(false)}/>}
+      {showAudit && <AuditPanel onClose={() => setShowAudit(false)} />}
       {showHotkeys && <HotkeysHelp onClose={() => setShowHotkeys(false)} />}
       <ToastHost />
     </div>);
