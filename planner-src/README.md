@@ -21,6 +21,21 @@ npx serve planner-src
 ### Opção 3 — VSCode
 Instale a extensão **Live Server** → clique direito em `index.html` → "Open with Live Server".
 
+
+## Publicar no GitHub Pages
+
+Este repositório já possui workflow para publicar automaticamente a pasta `planner-src/` no GitHub Pages (`.github/workflows/deploy-pages.yml`).
+
+### Passo a passo
+
+1. Faça push para a branch `main`.
+2. No GitHub, vá em **Settings → Pages** e em **Build and deployment** selecione **Source: GitHub Actions**.
+3. Aguarde o workflow **"Deploy planner-src to GitHub Pages"** finalizar (aba **Actions**).
+4. A URL final normalmente fica:
+   - `https://<seu-usuario>.github.io/<seu-repo>/`
+
+> Observação: como o build publica `planner-src` como raiz do site, o `index.html` já abre direto no link acima.
+
 ## Estrutura
 
 ```
